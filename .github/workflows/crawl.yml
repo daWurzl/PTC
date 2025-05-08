@@ -3,7 +3,7 @@ name: Zeitsteuerung
 on:
   schedule:
     - cron: "*/30 * * * *"   # Alle 30 Minuten (UTC)
-  workflow_dispatch:         # Manuell starten möglich
+  workflow_dispatch:
 
 jobs:
   crawl:
@@ -24,4 +24,4 @@ jobs:
           pip install -r requirements.txt
 
       - name: Crawler starten
-        run: python crawl.py
+        run: python crawler/crawl.py   # ✅ Pfad angepasst
