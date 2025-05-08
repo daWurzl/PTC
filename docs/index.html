@@ -1,28 +1,101 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Druck-Ausschreibungen</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
-  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" />
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css" />
   <style>
-    body { font-family: 'Inter', sans-serif; background-color: #f9fafb; margin: 0; padding: 1rem; color: #111827; }
-    h1 { text-align: center; margin-bottom: 2rem; font-size: 2rem; color: #1f2937; }
-    .container { max-width: 1200px; margin: 0 auto; background: white; padding: 1rem; border-radius: 0.5rem;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.05); overflow-x: auto; }
-    table.dataTable { width: 100% !important; }
-    .dt-button { background-color: #2563eb !important; color: white !important; border: none !important;
-      padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s; }
-    .dt-button:hover { background-color: #1d4ed8 !important; }
-    @media (max-width: 768px) { h1 { font-size: 1.5rem; } .container { padding: 0.5rem; } }
+    :root {
+      --bg: #f9fafb;
+      --text: #111827;
+      --card: #ffffff;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1f2937;
+        --text: #f3f4f6;
+        --card: #374151;
+        --accent: #3b82f6;
+        --accent-hover: #60a5fa;
+      }
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 2rem;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: var(--card);
+      padding: 1rem;
+      border-radius: 0.75rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      overflow-x: auto;
+    }
+
+    table.dataTable {
+      width: 100% !important;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 0.75rem;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background-color: var(--bg);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) {
+      background-color: rgba(0, 0, 0, 0.02);
+    }
+
+    .dt-button {
+      background-color: var(--accent) !important;
+      color: #fff !important;
+      border: none !important;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .dt-button:hover {
+      background-color: var(--accent-hover) !important;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 1.5rem; }
+      .container { padding: 0.5rem; }
+    }
   </style>
 </head>
 <body>
   <h1>Druck-Ausschreibungen</h1>
   <div class="container">
-    <table id="ausschreibungen" class="display nowrap">
+    <table id="ausschreibungen" class="display nowrap" aria-describedby="ausschreibungstabelle">
       <thead>
         <tr>
           <th>Titel</th>
@@ -35,6 +108,7 @@
       <tbody></tbody>
     </table>
   </div>
+
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
@@ -44,15 +118,24 @@
     fetch('../data/results.csv')
       .then(response => response.text())
       .then(csv => {
-        const rows = csv.trim().split('\n').slice(1);
+        const rows = csv.trim().split('\\n').slice(1);
         const tbody = document.querySelector('#ausschreibungen tbody');
         rows.forEach(row => {
           const cols = row.split(',');
           if (cols.length >= 5) {
             const tr = document.createElement('tr');
-            cols.forEach(col => {
+            cols.forEach((col, i) => {
               const td = document.createElement('td');
-              td.textContent = col;
+              if (i === 2 && col.startsWith('http')) {
+                const a = document.createElement('a');
+                a.href = col;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                a.textContent = 'Zur Ausschreibung';
+                td.appendChild(a);
+              } else {
+                td.textContent = col;
+              }
               tr.appendChild(td);
             });
             tbody.appendChild(tr);
