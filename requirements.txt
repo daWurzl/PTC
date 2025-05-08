@@ -1,2 +1,7 @@
+# HTTP-Anfragen senden
 requests
+
+# Web-Scraping (Daten werden automatisch aus einer Webseite extrahiert)
+# und
+# HTML-Parsing (Analysieren und Umwandeln dieser Daten/Texte in eine strukturierte Form)
 beautifulsoup4
