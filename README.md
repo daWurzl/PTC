@@ -4,4 +4,3 @@ Tender Data Collection
 <br>
 ## Funktionen
 - durchsucht Webseiten nach Kriterien
-- extrahiert Daten
