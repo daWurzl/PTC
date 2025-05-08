@@ -17,6 +17,16 @@ URLS = [
     "https://www.vergabe.nrw.de/",
     "https://ausschreibungen-deutschland.de/",
     "https://subreport.de/ausschreibungen/auftraege-suchen/"
+    "https://Kleinanzeigen.de"
+    "https://Quoka.de"
+    "https://Markt.de"
+    "https://www.shpock.com"
+    "https://www.kalaydo.de"
+    "https://www.dhd24.com"
+    "https://www.locanto.de"
+    "https://www.locanto.de"
+    "https://www.anibis.ch"
+    "https://www.facebook.com/marketplace/"
 ]
 
 # 2. Suchkriterien aus CPV-Codes und Themenbereichen
