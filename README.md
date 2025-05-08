@@ -1,6 +1,5 @@
-# PTW
-
-Erfassung von Ausschreibungen
+# PTC
+Tender Data Collection
 
 
 ## Funktionen
