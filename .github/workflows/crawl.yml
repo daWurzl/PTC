@@ -3,7 +3,7 @@ name: Zeitsteuerung
 on:
   schedule:
     - cron: "*/30 * * * *"   # Alle 30 Minuten (UTC)
-  workflow_dispatch:
+  workflow_dispatch: # manuell auslösbar über GitHub Actions
 
 jobs:
   crawl:
