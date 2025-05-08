@@ -158,15 +158,21 @@
         }
       });
 
-      new DataTable('#ausschreibungen', {
+      const table = new DataTable('#ausschreibungen', {
         dom: 'Bfrtip',
         responsive: true,
         buttons: ['csvHtml5'],
         language: {
           url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/de-DE.json',
-          search: "Suche " // Für die Label-Bezeichnung
+          search: "Suche " // Optional für das Label vom Suchfeld
         }
       });
+
+      // Hier setzen wir den Placeholder für das Suchfeld
+      const searchInput = document.querySelector('#ausschreibungen_filter input');
+      if (searchInput) {
+        searchInput.placeholder = "suchen..."; // Placeholder-Text hier einstellen
+      }
     });
 </script>
 
