@@ -158,17 +158,43 @@
         }
       });
 
-      const table = new DataTable('#ausschreibungen', {
-        dom: 'Bfrtip',
-        responsive: true,
-        buttons: ['csvHtml5'],
-        language: {
-          url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/de-DE.json',
-          search: "Suchen ", // Label oben > links neben dem Suchfeld
-          searchPlaceholder: " suchen ..." // Text Placeholder im Input-Feld
-        }
-      });
-    });
+// Initialisiert eine neue DataTable-Instanz für das HTML-Element mit der ID "ausschreibungen"
+const table = new DataTable('#ausschreibungen', {
+  
+  // Legt das Layout-Template der DataTable fest.
+  // Die einzelnen Zeichen stehen für:
+  // 'B' - Buttons (z.B. Export-Buttons)
+  // 'f' - Filter (Suchfeld)
+  // 'r' - "Processing" Anzeige (bei lang laufenden Operationen)
+  // 't' - Tabelle (das eigentliche Tabellenelement)
+  // 'i' - Informationsanzeige (z.B. "Zeige x bis y Einträge von z")
+  // 'p' - Paging (Seitennavigation)
+  dom: 'Bfrtip',
+
+  // Aktiviert das responsive Verhalten der Tabelle,
+  // sodass sich die Darstellung je nach Bildschirmgröße dynamisch anpasst.
+  responsive: true,
+
+  // Fügt einen Button hinzu, mit dem der Tabelleninhalt als CSV exportiert werden kann.
+  // 'csvHtml5' steht hier für den Export über HTML5-Funktionalitäten.
+  buttons: ['csvHtml5'],
+
+  // Sprach- und Texteinstellungen, um die Benutzeroberfläche der DataTable zu lokalisieren.
+  language: {
+    // Lädt ein JSON-File mit deutschen Übersetzungen für die DataTable-Oberfläche.
+    url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/de-DE.json',
+    
+    // Überschreibt das Standardlabel des Suchfeldes.
+    // Dieser Text wird links neben dem Suchfeld angezeigt.
+    search: "Suchen ", // Label oben > links neben dem Suchfeld
+    
+    // Setzt den Placeholder-Text des eigentlichen Input-Feldes.
+    // Dieser Text erscheint im Eingabebereich, solange noch nichts eingegeben wurde.
+    searchPlaceholder: " suchen ..." // Text Placeholder im Input-Feld
+  }
+});
+
+});
 </script>
 
 </body>
