@@ -3,8 +3,12 @@ from bs4 import BeautifulSoup
 import csv
 from datetime import datetime
 
+# Platzhalter-URLs
 URLS = [f"https://webseite-{i}.de" for i in range(1, 21)]
-CRITERIA = [f"Kriterium {i}" for i in range(1, 11)]
+
+# Platzhalter-Kriterien
+CRITERIA = [f"Kriterium-{i}" for i in range(1, 11)]
+
 results = []
 
 for url in URLS:
