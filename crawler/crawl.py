@@ -3,7 +3,14 @@ from bs4 import BeautifulSoup
 import csv
 from datetime import datetime
 
-# 1. Ausschreibungs-Webseiten (bereinigt und ergänzt)
+# 1. JavaScript-basierte Seiten (werden mit Playwright geladen)
+JS_SITES = [
+    "facebook.com/marketplace",
+    "kleinanzeigen.de",
+    "quoka.de"
+]
+
+# 2. Ausschreibungs-Webseiten (bereinigt und ergänzt)
 URLS = [
     "https://ausschreibungen-deutschland.de/cpv/",
     "https://www.dtvp.de/Center/common/project/search.do?method=showExtendedSearch&fromExternal=true",
@@ -17,9 +24,9 @@ URLS = [
     "https://www.vergabe.nrw.de/",
     "https://ausschreibungen-deutschland.de/",
     "https://subreport.de/ausschreibungen/auftraege-suchen/",
-    "https://Kleinanzeigen.de",
-    "https://Quoka.de",
-    "https://Markt.de",
+    "https://www.kleinanzeigen.de",
+    "https://www.quoka.de",
+    "https://www.markt.de",
     "https://www.shpock.com",
     "https://www.kalaydo.de",
     "https://www.dhd24.com",
@@ -28,7 +35,7 @@ URLS = [
     "https://www.facebook.com/marketplace/"
 ]
 
-# 2. Suchkriterien aus CPV-Codes und Themenbereichen
+# 3. Suchkriterien aus CPV-Codes und Themenbereichen
 CRITERIA = [
     # CPV-Codes
     "22000000-0", "22100000-1", "22110000-4", "22120000-7", "22450000-9",
@@ -63,29 +70,57 @@ CRITERIA = [
     "Suche Buchbinderei", "Suche Digitaldruckerei", "Suche Werbemittelhersteller"
 ]
 
-# 3. Ergebnisdatei
+# 4. Ergebnisdatei
 OUTPUT_FILE = "results.csv"
 
+# Prüft, ob eine URL JavaScript erfordert
+def is_js_site(url):
+    return any(js in url for js in JS_SITES)
+
+# Liefert HTML-Quelltext mit requests oder Playwright
+def get_page_text(url):
+    if is_js_site(url):
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                page.goto(url, timeout=20000)
+                content = page.content()
+                browser.close()
+                return content
+        except Exception as e:
+            print(f"⚠️ Fehler mit Playwright bei {url}: {e}")
+            return ""
+    else:
+        try:
+            response = requests.get(url, timeout=15)
+            response.raise_for_status()
+            return response.text
+        except Exception as e:
+            print(f"⚠️ Fehler mit Requests bei {url}: {e}")
+            return ""
+
+# Text auf Suchbegriffe prüfen
 def page_matches_criteria(text, criteria):
     return any(criterion.lower() in text.lower() for criterion in criteria)
 
+# Hauptcrawler
 def crawl():
     results = []
 
     for url in URLS:
-        try:
-            response = requests.get(url, timeout=15)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, "html.parser")
-            text = soup.get_text(separator=" ", strip=True)
+        html = get_page_text(url)
+        if not html:
+            continue
 
-            if page_matches_criteria(text, CRITERIA):
-                title = soup.title.string.strip() if soup.title else "Kein Titel"
-                date = datetime.now().strftime("%Y-%m-%d")
-                results.append([title, date, url, "k.A.", "n.v."])
+        soup = BeautifulSoup(html, "html.parser")
+        text = soup.get_text(separator=" ", strip=True)
 
-        except Exception as e:
-            print(f"Fehler bei {url}: {e}")
+        if page_matches_criteria(text, CRITERIA):
+            title = soup.title.string.strip() if soup.title else "Kein Titel"
+            date = datetime.now().strftime("%Y-%m-%d")
+            results.append([title, date, url, "k.A.", "n.v."])
 
     # Ergebnisse speichern
     with open(OUTPUT_FILE, "w", newline='', encoding='utf-8') as f:
