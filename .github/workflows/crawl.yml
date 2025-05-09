@@ -3,7 +3,7 @@ name: Zeitsteuerung
 on:
   schedule:
     - cron: "*/30 * * * *"   # Alle 30 Minuten (UTC)
-  workflow_dispatch: # manuell auslösbar über GitHub Actions
+  workflow_dispatch:         # manuell auslösbar über GitHub Actions
 
 jobs:
   crawl:
@@ -23,5 +23,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Installiere Playwright + Browser
+        run: |
+          playwright install
+
       - name: Crawler starten
-        run: python crawler/crawl.py   # ✅ Pfad angepasst
+        run: python crawler/crawl.py   # ✅ Pfad zum Skript
