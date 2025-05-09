@@ -8,19 +8,16 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Logging-Konfiguration:
-# - Logs werden in die Datei "crawler.log" (UTF-8) geschrieben
-# - Zudem erfolgt eine Ausgabe auf der Konsole (StreamHandler)
+# - Logs werden NUR in die Datei "crawler.log" (UTF-8) geschrieben, keine Konsolenausgabe!
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        logging.FileHandler("crawler.log", encoding="utf-8"),
-        logging.StreamHandler()
+        logging.FileHandler("crawler.log", encoding="utf-8")
     ]
 )
 
 # Beispielhafte Proxy-Liste:
-# Für den produktiven Einsatz sollten stabile, eigene oder kommerzielle Proxys genutzt werden.
 PROXIES = [
     "http://162.249.171.248:4092",
     "http://5.8.240.91:4153",
@@ -29,7 +26,7 @@ PROXIES = [
     "http://64.71.151.20:8888"
 ]
 
-# Liste realistischer User-Agents, die dazu beitragen, nicht sofort als Bot erkannt zu werden.
+# Liste realistischer User-Agents
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
@@ -37,7 +34,7 @@ USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0"
 ]
 
-# JS_SITES: Liste der Domains, die vermutlich JavaScript zum Rendern der Inhalte benötigen.
+# JS_SITES: Domains, die vermutlich JavaScript zum Rendern benötigen.
 JS_SITES = [
     "vergabemarktplatz.de",
     "tendersinfo.com",
@@ -46,17 +43,26 @@ JS_SITES = [
     "tendertiger.de"
 ]
 
-# URLS: Statische Seiten, von denen angenommen wird, dass sie ohne JavaScript vollständig geladen werden.
+# URLS: Enthält nun auch viele große Crawler-Zielseiten (wie gewünscht ergänzt)
 URLS = [
     "https://www.bundesanzeiger.de/",
     "https://www.ausschreibungsmonitor.de/",
     "https://www.druckportal.de/",
     "https://www.auftragsboerse.de/",
-    "https://www.ausschreibungen-aktuell.de/"
+    "https://www.ausschreibungen-aktuell.de/",
+    # Ergänzte Webseiten, die von wichtigen Webcrawlern besucht werden:
+    "https://www.yandex.com/",
+    "https://www.duckduckgo.com/",
+    "https://www.apple.com/",
+    "https://www.baidu.com/",
+    "https://www.facebook.com/",
+    "https://www.yahoo.com/",
+    "https://commoncrawl.org/",
+    "https://www.swiftype.com/",
+    "https://www.exalead.com/"
 ]
 
-# CRITERIA: Liste von Suchbegriffen (z. B. CPV-Codes, Druckerzeugnisse, Werbemittel, etc.).
-# Diese werden später dazu genutzt, den Seiteninhalt auf das Vorhandensein der gesuchten Begriffe zu überprüfen.
+# CRITERIA: Liste von Suchbegriffen (z.B. CPV-Codes, Druckerzeugnisse, Werbemittel, etc.).
 CRITERIA = [
     # CPV-Codes
     "22000000-0", "22100000-1", "22110000-4", "22120000-7", "22450000-9",
@@ -91,26 +97,16 @@ CRITERIA = [
     "Suche Buchbinderei", "Suche Digitaldruckerei", "Suche Werbemittelhersteller"
 ]
 
-# Datei, in der die Ergebnisse (Treffer) gespeichert werden.
 OUTPUT_FILE = "results.csv"
 
 def is_js_site(url):
-    """
-    Prüft, ob eine URL JavaScript-Rendering benötigt.
-    Wird dies anhand der Einträge in JS_SITES festgestellt, so wird True zurückgegeben.
-    """
+    """Prüft, ob eine URL JavaScript-Rendering benötigt."""
     return any(js in url for js in JS_SITES)
 
 def get_requests_with_retry(url, max_retries=3, use_proxy=True):
     """
     Versucht, die Seite mit Requests abzurufen.
-    Dabei werden für jeden Versuch ein zufälliger User-Agent sowie (optional) ein zufälliger Proxy genutzt.
-    Bei einem Fehler erfolgt ein exponentielles Backoff (Verzögerung).
-    
-    :param url: Abzurufende URL
-    :param max_retries: Maximale Anzahl an Versuchen
-    :param use_proxy: Boolean, ob Proxys eingesetzt werden sollen
-    :return: HTML-Text der Seite oder einen leeren String, wenn alle Versuche fehlschlagen.
+    Nutzt zufälligen User-Agent und optional Proxy.
     """
     for attempt in range(max_retries):
         try:
@@ -128,19 +124,13 @@ def get_requests_with_retry(url, max_retries=3, use_proxy=True):
             return response.text
         except Exception as e:
             logging.warning(f"Fehler bei {url} (Versuch {attempt+1}/{max_retries}): {e}")
-            time.sleep(2 ** attempt)  # Erhöhte Wartezeit bei erneuten Versuchen (exponentielles Backoff)
+            time.sleep(2 ** attempt)
     logging.error(f"Maximale Versuche für {url} erreicht.")
     return ""
 
 def get_playwright_with_retry(url, max_retries=3):
     """
     Versucht, die Seite mit Playwright zu laden, wenn JavaScript-Rendering benötigt wird.
-    Hier werden ein zufälliger User-Agent und ein zufälliger Proxy eingesetzt.
-    Es wird explizit auf den <body>-Tag gewartet.
-    
-    :param url: Abzurufende URL
-    :param max_retries: Maximale Anzahl an Versuchen
-    :return: HTML-Text der Seite oder einen leeren String bei Misserfolg.
     """
     for attempt in range(max_retries):
         try:
@@ -148,13 +138,11 @@ def get_playwright_with_retry(url, max_retries=3):
             proxy = random.choice(PROXIES)
             from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
             with sync_playwright() as p:
-                # Startet einen Chromium-Browser im Headless-Modus mit Proxy-Einstellung
                 browser = p.chromium.launch(headless=True, proxy={"server": proxy})
                 context = browser.new_context(user_agent=user_agent)
                 page = context.new_page()
                 page.goto(url, timeout=20000)
                 try:
-                    # Warte explizit auf das "body"-Tag, um sicherzustellen, dass Inhalte geladen wurden.
                     page.wait_for_selector("body", timeout=5000)
                 except PlaywrightTimeout:
                     logging.warning(f"Timeout auf body-Selector bei {url}")
@@ -171,37 +159,20 @@ def get_page_text(url):
     """
     Wählt die passende Methode aus (Requests oder Playwright) basierend darauf,
     ob die URL als JavaScript-basierte Seite markiert ist.
-    
-    :param url: Abzurufende URL
-    :return: HTML-Inhalt der Seite als Text
     """
-    time.sleep(random.uniform(2, 6))  # Simuliert menschliches Verhalten (zufällige Pause)
+    time.sleep(random.uniform(2, 6))
     if is_js_site(url):
         return get_playwright_with_retry(url)
     else:
         return get_requests_with_retry(url)
 
 def page_matches_criteria(text, criteria):
-    """
-    Überprüft, ob einer der vordefinierten Suchbegriffe (CRITERIA) im Text vorkommt.
-    
-    :param text: Zu durchsuchender Text
-    :param criteria: Liste der Suchbegriffe
-    :return: True, wenn mindestens ein Suchbegriff gefunden wurde, sonst False.
-    """
+    """Überprüft, ob einer der Suchbegriffe im Text vorkommt."""
     return any(criterion.lower() in text.lower() for criterion in criteria)
 
 def crawl_url(url):
     """
-    Crawlt eine einzelne URL:
-      - Holt den Seiteninhalt über die passende Methode
-      - Parst den HTML-Inhalt mit BeautifulSoup
-      - Überprüft, ob die Seite einen der Suchbegriffe enthält
-      - Gibt bei Erfolg eine Ergebnisliste [Titel, Datum, URL, Budget, Anschrift] zurück
-      - Gibt None zurück, wenn kein Treffer vorliegt.
-    
-    :param url: Zu crawlende URL
-    :return: Ergebnisliste oder None
+    Crawlt eine einzelne URL und gibt ggf. ein Treffer-Array zurück.
     """
     html = get_page_text(url)
     if not html:
@@ -220,20 +191,15 @@ def crawl_url(url):
 
 def crawl():
     """
-    Hauptfunktion des Crawlers:
-      - Nutzt einen ThreadPoolExecutor zur parallelen Verarbeitung der definierten URLs
-      - Iteriert über die Ergebnisse und sammelt Treffer
-      - Speichert die Ergebnisse in einer CSV-Datei (OUTPUT_FILE)
+    Hauptfunktion des Crawlers: Paralleles Crawlen und Speichern der Treffer.
     """
     results = []
-    # Parallele Verarbeitung der URLs (max. 5 Threads – dies ist anpassbar)
     with ThreadPoolExecutor(max_workers=5) as executor:
         future_to_url = {executor.submit(crawl_url, url): url for url in URLS}
         for future in as_completed(future_to_url):
             result = future.result()
             if result:
                 results.append(result)
-    # Speichert die ermittelten Ergebnisse in einer CSV-Datei
     with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["Titel", "Datum", "Link", "Budget", "Anschrift"])
