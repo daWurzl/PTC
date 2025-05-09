@@ -2,8 +2,8 @@ name: Zeitsteuerung
 
 on:
   schedule:
-    - cron: "*/240 * * * *"   # Alle 240 Minuten (UTC)
-  workflow_dispatch:         # manuell auslösbar über GitHub Actions
+    - cron: "0 */4 * * *"   # Alle 4 Stunden (240 Min., UTC)
+  workflow_dispatch:        # manuell auslösbar über GitHub Actions
 
 jobs:
   crawl:
