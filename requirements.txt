@@ -1,6 +1,13 @@
-# HTTP-Anfragen senden
+# HTTP-Anfragen dienen der Kommunikation zwischen Browser und Server,
+# indem sie Informationen oder Ressourcen anfordern oder übertragen
 requests
 
 # Web-Scraping (Daten werden automatisch aus einer Webseite extrahiert)
 # und HTML-Parsing (Analysieren und Umwandeln dieser Daten in eine strukturierte Form)
 beautifulsoup4
+
+# Playwright steuert Anwendungen wie Webseiten, Formulareingaben, Klicksimulationen
+# sowie die Aufzeichnung von Screenshots/Videos und ist ideal für das Web-Scraping -
+# unterstützt den Headless-Modus, sodass Anwendungen ohne grafische Benutzeroberfläche
+# schnell und ressourcensparend ausgeführt werden
+playwright
