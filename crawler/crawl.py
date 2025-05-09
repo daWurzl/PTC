@@ -9,7 +9,22 @@ import time
 JS_SITES = [
     "facebook.com/marketplace",
     "kleinanzeigen.de",
-    "quoka.de"
+    "quoka.de",
+    "dtvp.de",
+    "ted.europa.eu",
+    "evergabe.de",
+    "aumass.de",
+    "auftraege.bayern.de",
+    "deutsches-ausschreibungsblatt.de",
+    "vergabe.nrw.de",
+    "subreport.de",
+    "markt.de",
+    "shpock.com",
+    "kalaydo.de",
+    "dhd24.com",
+    "locanto.de",
+    "anibis.ch",
+    "facebook.com/marketplace"
 ]
 
 # 2. Ausschreibungs-Webseiten (bereinigt und ergänzt)
@@ -39,35 +54,25 @@ URLS = [
 
 # 3. Suchkriterien aus CPV-Codes und Themenbereichen
 CRITERIA = [
-    # CPV-Codes
+    "PC", "Auto",  # Neue Kriterien für Kleinanzeigen
     "22000000-0", "22100000-1", "22110000-4", "22120000-7", "22450000-9",
     "22460000-2", "79800000-2", "79810000-5", "79820000-8", "79823000-9",
-    # Standard-Druckerzeugnisse
     "Bücher", "Magazine", "Broschüren", "Festschriften", "Zeitungen", "Druckerzeugnisse", "Kopien",
-    # Geschäftsdrucksachen
     "Briefpapier", "Umschläge", "Briefhüllen", "Geschäftspapier", "Visitenkarten",
     "Geschäftsberichte", "Mappen", "Schreibhefte",
-    # Werbe- & Marketingmaterial
     "Flyer", "Prospekte", "Plakate", "Werbetafeln", "Werbedisplays",
     "Aufsteller", "Displays",
-    # Veranstaltungs- & Spezialdrucksachen
     "Tickets", "Eintrittskarten", "Einladungskarten", "Eventdrucksachen", "Posterkarten",
-    # Verpackungen & Etiketten
     "Verpackungen", "Geschenkverpackungen", "Verpackungsbanderolen", "Tragetaschen",
     "Klebefolien", "Stickersets",
-    # Personalisierte & Hochwertige Drucksachen
     "Hochzeitskarten", "Trauerdrucksachen", "Sterbebilder", "Fahnen", "Flaggen",
     "Personalisierte Drucksachen", "Plastikkarten", "Geschenkpapier",
-    # Formulare & Dokumente
     "Formulare", "Vordrucke", "Bedienungsanleitungen", "Wartungshandbücher",
     "Vereinsdrucksachen", "Mitgliedsausweise", "Dokumentationen",
-    # Nachhaltige & Spezialdrucke
     "Recyclingverpackungen", "FSC-Zertifikat", "3D-Drucke", "Geprägte Druckmaterialien",
     "Wasserfeste Druckerzeugnisse", "Umweltfreundliche Druckerzeugnisse",
-    # Großformate & spezielle Anwendungen
     "Banner", "Wandkalender", "Kalender", "Kataloge", "Speisekarten",
     "Gutscheine", "Urkunden", "Großformatdrucke", "Schilder",
-    # Suche / Anbieteranfragen
     "Autor sucht", "Kleinautor sucht", "Suche Druckerei", "Suche Verlag",
     "Suche Buchbinderei", "Suche Digitaldruckerei", "Suche Werbemittelhersteller"
 ]
@@ -83,67 +88,79 @@ USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0"
 ]
 
-# Prüft, ob eine URL JavaScript erfordert
 def is_js_site(url):
-    return any(js in url for js in JS_SITES)
+    url = url.lower()
+    return any(js_site in url for js_site in JS_SITES)
 
-# Liefert HTML-Quelltext mit requests oder Playwright
 def get_page_text(url):
-    # Zufälligen User-Agent wählen
     user_agent = random.choice(USER_AGENTS)
     headers = {"User-Agent": user_agent}
-
-    # Zufällige Wartezeit (zwischen 2 und 6 Sekunden) vor jedem Request, um menschliches Verhalten zu simulieren
     time.sleep(random.uniform(2, 6))
 
+    print(f"\nLade: {url}")
     if is_js_site(url):
+        print("-> Versuche Playwright (JavaScript-Seite)")
         try:
             from playwright.sync_api import sync_playwright
             with sync_playwright() as p:
-                # Headless-Browser starten (headless=True)
                 browser = p.chromium.launch(headless=True)
                 context = browser.new_context(user_agent=user_agent)
                 page = context.new_page()
-                page.goto(url, timeout=20000)
-
-                # Nach dem Laden der Seite noch eine kurze, zufällige Wartezeit (0.5-2s)
+                page.goto(url, timeout=30000)
                 time.sleep(random.uniform(0.5, 2))
-
                 content = page.content()
                 browser.close()
+                if len(content) < 500:
+                    print("⚠️ Playwright: Sehr wenig Inhalt geladen!")
+                else:
+                    print(f"Playwright: {len(content)} Zeichen geladen.")
+                print("HTML-Ausschnitt:", content[:300].replace('\n', ' '))
                 return content
         except Exception as e:
             print(f"⚠️ Fehler mit Playwright bei {url}: {e}")
             return ""
     else:
+        print("-> Versuche Requests")
         try:
             response = requests.get(url, headers=headers, timeout=15)
             response.raise_for_status()
-            return response.text
+            text = response.text
+            if len(text) < 500:
+                print("⚠️ Requests: Sehr wenig Inhalt geladen!")
+            else:
+                print(f"Requests: {len(text)} Zeichen geladen.")
+            print("HTML-Ausschnitt:", text[:300].replace('\n', ' '))
+            return text
         except Exception as e:
             print(f"⚠️ Fehler mit Requests bei {url}: {e}")
             return ""
 
-# Text auf Suchbegriffe prüfen
 def page_matches_criteria(text, criteria):
-    return any(criterion.lower() in text.lower() for criterion in criteria)
+    for criterion in criteria:
+        if criterion.lower() in text.lower():
+            print(f"Treffer für Suchbegriff: '{criterion}'")
+            return True
+    return False
 
-# Hauptcrawler
 def crawl():
     results = []
-
     for url in URLS:
         html = get_page_text(url)
         if not html:
+            print(f"Keine Daten von {url} erhalten.")
             continue
 
         soup = BeautifulSoup(html, "html.parser")
         text = soup.get_text(separator=" ", strip=True)
+        print(f"Text-Länge nach Parsing: {len(text)} Zeichen")
 
         if page_matches_criteria(text, CRITERIA):
             title = soup.title.string.strip() if soup.title else "Kein Titel"
             date = datetime.now().strftime("%Y-%m-%d")
             results.append([title, date, url, "k.A.", "n.v."])
+            print(f"-> Ergebnis hinzugefügt: {title}")
+        else:
+            print("-> Keine Suchbegriffe gefunden.")
 
     # Ergebnisse speichern
     with open(OUTPUT_FILE, "w", newline='', encoding='utf-8') as f:
@@ -151,7 +168,11 @@ def crawl():
         writer.writerow(["Titel", "Datum", "Link", "Budget", "Anschrift"])
         writer.writerows(results)
 
-    print(f"{len(results)} Treffer gespeichert in {OUTPUT_FILE}")
+    print(f"\n{len(results)} Treffer gespeichert in {OUTPUT_FILE}")
+    if results:
+        print("Ergebnisse:")
+        for r in results:
+            print(r)
 
 if __name__ == "__main__":
     crawl()
