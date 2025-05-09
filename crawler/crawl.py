@@ -2,6 +2,8 @@ import requests
 from bs4 import BeautifulSoup
 import csv
 from datetime import datetime
+import random
+import time
 
 # 1. JavaScript-basierte Seiten (werden mit Playwright geladen)
 JS_SITES = [
@@ -73,19 +75,40 @@ CRITERIA = [
 # 4. Ergebnisdatei
 OUTPUT_FILE = "results.csv"
 
+# Liste realistischer User-Agents (kann beliebig erweitert werden)
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0"
+]
+
 # Prüft, ob eine URL JavaScript erfordert
 def is_js_site(url):
     return any(js in url for js in JS_SITES)
 
 # Liefert HTML-Quelltext mit requests oder Playwright
 def get_page_text(url):
+    # Zufälligen User-Agent wählen
+    user_agent = random.choice(USER_AGENTS)
+    headers = {"User-Agent": user_agent}
+
+    # Zufällige Wartezeit (zwischen 2 und 6 Sekunden) vor jedem Request, um menschliches Verhalten zu simulieren
+    time.sleep(random.uniform(2, 6))
+
     if is_js_site(url):
         try:
             from playwright.sync_api import sync_playwright
             with sync_playwright() as p:
+                # Headless-Browser starten (headless=True)
                 browser = p.chromium.launch(headless=True)
-                page = browser.new_page()
+                context = browser.new_context(user_agent=user_agent)
+                page = context.new_page()
                 page.goto(url, timeout=20000)
+
+                # Nach dem Laden der Seite noch eine kurze, zufällige Wartezeit (0.5-2s)
+                time.sleep(random.uniform(0.5, 2))
+
                 content = page.content()
                 browser.close()
                 return content
@@ -94,7 +117,7 @@ def get_page_text(url):
             return ""
     else:
         try:
-            response = requests.get(url, timeout=15)
+            response = requests.get(url, headers=headers, timeout=15)
             response.raise_for_status()
             return response.text
         except Exception as e:
