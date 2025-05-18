@@ -11,3 +11,13 @@ beautifulsoup4
 # unterstützt den Headless-Modus, sodass Anwendungen ohne grafische Benutzeroberfläche
 # schnell und ressourcensparend ausgeführt werden
 playwright
+
+# --- Ergänzungen für asynchrones und robustes Crawling ---
+
+# aiohttp ermöglicht asynchrone HTTP-Anfragen und ist optimal für parallele,
+# schnelle Webanfragen ohne Blockierung des Programms (wichtig für hohe Skalierbarkeit)
+aiohttp
+
+# tenacity bietet eine flexible und zuverlässige Retry-Logik (Wiederholungsmechanismen)
+# mit Backoff-Strategien, um Netzwerkfehler und temporäre Probleme automatisch abzufangen
+tenacity
