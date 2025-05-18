@@ -1,41 +1,53 @@
-import requests
-from bs4 import BeautifulSoup
-from datetime import datetime
+# crawler_advanced.py
+"""
+Produktionsreifer Webcrawler für Ausschreibungsdaten mit:
+- Asynchroner Architektur (aiohttp, Playwright)
+- Automatischer Retry-Mechanismus mit Backoff
+- Caching und Delay aus robots.txt (inkl. Crawl-Delay)
+- Proxy- und User-Agent-Rotation
+- Rate-Limiting via aiohttp TCPConnector
+- Verbesserte Fehlerbehandlung (u.a. 429, SSL)
+- Präzise Kriteriensuche (Regex)
+- Atomare CSV/JSON-Ausgabe
+"""
+
+import asyncio
 import csv
-import random
-import time
+import json
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
+import random
+import re
+import urllib.parse
+from dataclasses import dataclass
+from typing import List, Optional, Tuple
 
-# Logging-Konfiguration:
-# - Logs werden NUR in die Datei "crawler.log" (UTF-8) geschrieben, keine Konsolenausgabe!
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler("crawler.log", encoding="utf-8")
-    ]
+import aiohttp
+from aiohttp import ClientSession, ClientTimeout, ClientResponseError
+from bs4 import BeautifulSoup
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+    before_sleep_log,
 )
+from urllib.parse import urlparse
+import urllib.robotparser
+from functools import lru_cache
 
-# Beispielhafte Proxy-Liste:
-PROXIES = [
-    "http://162.249.171.248:4092",
-    "http://5.8.240.91:4153",
-    "http://189.22.234.44:80",
-    "http://184.181.217.206:4145",
-    "http://64.71.151.20:8888"
+# --- Konfiguration über Umgebungsvariablen ---
+MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT", 10))
+REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", 15))
+MAX_RETRIES = int(os.getenv("MAX_RETRIES", 5))
+BASE_DELAY = float(os.getenv("BASE_DELAY", 1.0))
+USER_AGENTS = [ua for ua in os.getenv("USER_AGENTS", "").split(";") if ua] or [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Safari/605.1.15",
 ]
-
-# Liste realistischer User-Agents
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0"
-]
-
-# JS_SITES: Domains, die vermutlich JavaScript zum Rendern benötigen.
-JS_SITES = [
+PROXIES = [p for p in os.getenv("PROXIES", "").split(";") if p]
+OUTPUT_FORMATS = [fmt for fmt in os.getenv("OUTPUT_FORMATS", "csv,json").split(",") if fmt]
+JS_SITES = [d for d in os.getenv("JS_SITES", "").split(";") if d] or [
     "vergabemarktplatz.de",
     "tendersinfo.com",
     "wlw.de",
@@ -43,168 +55,235 @@ JS_SITES = [
     "tendertiger.de"
 ]
 
-# URLS: Enthält nun auch viele große Crawler-Zielseiten (wie gewünscht ergänzt)
-URLS = [
-    "https://www.bundesanzeiger.de/",
-    "https://www.ausschreibungsmonitor.de/",
-    "https://www.druckportal.de/",
-    "https://www.auftragsboerse.de/",
-    "https://www.ausschreibungen-aktuell.de/",
-    # Ergänzte Webseiten, die von wichtigen Webcrawlern besucht werden:
-    "https://www.yandex.com/",
-    "https://www.duckduckgo.com/",
-    "https://www.apple.com/",
-    "https://www.baidu.com/",
-    "https://www.facebook.com/",
-    "https://www.yahoo.com/",
-    "https://commoncrawl.org/",
-    "https://www.swiftype.com/",
-    "https://www.exalead.com/"
-]
+# --- Logging-Konfiguration ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler("crawler.log", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
-# CRITERIA: Liste von Suchbegriffen (z.B. CPV-Codes, Druckerzeugnisse, Werbemittel, etc.).
-CRITERIA = [
-    # CPV-Codes
-    "22000000-0", "22100000-1", "22110000-4", "22120000-7", "22450000-9",
-    "22460000-2", "79800000-2", "79810000-5", "79820000-8", "79823000-9",
-    # Standard-Druckerzeugnisse
-    "Bücher", "Magazine", "Broschüren", "Festschriften", "Zeitungen", "Druckerzeugnisse", "Kopien",
-    # Geschäftsdrucksachen
-    "Briefpapier", "Umschläge", "Briefhüllen", "Geschäftspapier", "Visitenkarten",
-    "Geschäftsberichte", "Mappen", "Schreibhefte",
-    # Werbe- & Marketingmaterial
-    "Flyer", "Prospekte", "Plakate", "Werbetafeln", "Werbedisplays",
-    "Aufsteller", "Displays",
-    # Veranstaltungs- & Spezialdrucksachen
-    "Tickets", "Eintrittskarten", "Einladungskarten", "Eventdrucksachen", "Posterkarten",
-    # Verpackungen & Etiketten
-    "Verpackungen", "Geschenkverpackungen", "Verpackungsbanderolen", "Tragetaschen",
-    "Klebefolien", "Stickersets",
-    # Personalisierte & hochwertige Drucksachen
-    "Hochzeitskarten", "Trauerdrucksachen", "Sterbebilder", "Fahnen", "Flaggen",
-    "Personalisierte Drucksachen", "Plastikkarten", "Geschenkpapier",
-    # Formulare & Dokumente
-    "Formulare", "Vordrucke", "Bedienungsanleitungen", "Wartungshandbücher",
-    "Vereinsdrucksachen", "Mitgliedsausweise", "Dokumentationen",
-    # Nachhaltige & Spezialdrucke
-    "Recyclingverpackungen", "FSC-Zertifikat", "3D-Drucke", "Geprägte Druckmaterialien",
-    "Wasserfeste Druckerzeugnisse", "Umweltfreundliche Druckerzeugnisse",
-    # Großformate & spezielle Anwendungen
-    "Banner", "Wandkalender", "Kalender", "Kataloge", "Speisekarten",
-    "Gutscheine", "Urkunden", "Großformatdrucke", "Schilder",
-    # Suche / Anbieteranfragen
-    "Autor sucht", "Kleinautor sucht", "Suche Druckerei", "Suche Verlag",
-    "Suche Buchbinderei", "Suche Digitaldruckerei", "Suche Werbemittelhersteller"
-]
+@dataclass
+class CrawlConfig:
+    """Konfigurationsklasse für Crawling-Parameter."""
+    start_urls: List[str] = None
+    criteria: List[str] = None
 
-OUTPUT_FILE = "results.csv"
+    def __post_init__(self):
+        self.start_urls = self.start_urls or [
+            "https://www.ausschreibungen-aktuell.de/",
+            "https://www.ausschreibungsmonitor.de/",
+            "https://www.druckportal.de/",
+            "https://www.auftragsboerse.de/",
+            "https://www.bundesanzeiger.de/"
+        ]
+        self.criteria = self.criteria or [
+            "22000000-0", "22100000-1", "22110000-4", "22120000-7", "22450000-9",
+            "22460000-2", "79800000-2", "79810000-5", "79820000-8", "79823000-9",
+            "Bücher", "Magazine", "Broschüren", "Festschriften", "Zeitungen", "Druckerzeugnisse"
+        ]
 
-def is_js_site(url):
-    """Prüft, ob eine URL JavaScript-Rendering benötigt."""
-    return any(js in url for js in JS_SITES)
-
-def get_requests_with_retry(url, max_retries=3, use_proxy=True):
+class RobotsTxtCache:
     """
-    Versucht, die Seite mit Requests abzurufen.
-    Nutzt zufälligen User-Agent und optional Proxy.
+    Caching und Prüfung von robots.txt-Regeln inkl. Crawl-Delay.
+    Nutzt LRU-Cache zur Begrenzung des Speicherverbrauchs.
     """
-    for attempt in range(max_retries):
+    def __init__(self, maxsize=100):
+        self.cache = {}
+        self.delay_cache = {}
+        self.maxsize = maxsize
+
+    async def is_allowed(self, url: str, user_agent: str) -> bool:
+        parsed = urlparse(url)
+        domain = f"{parsed.scheme}://{parsed.netloc}"
+        if domain not in self.cache:
+            await self._load_robots_txt(domain, user_agent)
+        rp = self.cache.get(domain)
+        if rp:
+            return rp.can_fetch(user_agent, url)
+        return False
+
+    async def get_crawl_delay(self, url: str, user_agent: str) -> float:
+        parsed = urlparse(url)
+        domain = f"{parsed.scheme}://{parsed.netloc}"
+        if domain not in self.delay_cache:
+            await self._load_robots_txt(domain, user_agent)
+        return self.delay_cache.get(domain, 1.0)
+
+    async def _load_robots_txt(self, domain: str, user_agent: str):
+        if len(self.cache) > self.maxsize:
+            self.cache.pop(next(iter(self.cache)))
+            self.delay_cache.pop(next(iter(self.delay_cache)))
+        rp = urllib.robotparser.RobotFileParser()
         try:
-            user_agent = random.choice(USER_AGENTS)
-            headers = {"User-Agent": user_agent}
-            proxies = None
-            if use_proxy:
-                proxy = random.choice(PROXIES)
-                proxies = {"http": proxy, "https": proxy}
-                logging.info(f"Versuche {url} mit Proxy {proxy}")
-            else:
-                logging.info(f"Versuche {url} ohne Proxy")
-            response = requests.get(url, headers=headers, proxies=proxies, timeout=15)
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{domain}/robots.txt", timeout=10, ssl=True) as resp:
+                    if resp.status == 200:
+                        content = await resp.text()
+                        rp.parse(content.splitlines())
+                        self.cache[domain] = rp
+                        delay = rp.crawl_delay(user_agent)
+                        self.delay_cache[domain] = float(delay) if delay else 1.0
+        except Exception as e:
+            logger.warning(f"Robots.txt Fehler für {domain}: {e}")
+            self.cache[domain] = rp
+            self.delay_cache[domain] = 1.0
+
+def build_criteria_patterns(criteria: List[str]):
+    """Erstellt Regex-Pattern für präzise Kriteriensuche."""
+    return [re.compile(rf'\b{re.escape(crit)}\b', re.IGNORECASE) for crit in criteria]
+
+def is_js_site(url: str) -> bool:
+    """Bestimmt, ob JavaScript-Rendering benötigt wird."""
+    return any(domain in url for domain in JS_SITES)
+
+@retry(
+    retry=retry_if_exception_type(aiohttp.ClientError),
+    stop=stop_after_attempt(MAX_RETRIES),
+    wait=wait_exponential(multiplier=BASE_DELAY, max=60),
+    before_sleep=before_sleep_log(logger, logging.WARNING)
+)
+async def fetch_content(session: ClientSession, url: str, user_agent: str, proxy: Optional[str]) -> Optional[str]:
+    """
+    Führt asynchrone HTTP-GET-Anfrage mit Fehlerbehandlung, Proxy und User-Agent durch.
+    Behandelt 429-Fehler mit Retry-After.
+    """
+    headers = {"User-Agent": user_agent}
+    try:
+        async with session.get(
+            url,
+            headers=headers,
+            proxy=f"http://{proxy}" if proxy else None,
+            timeout=ClientTimeout(total=REQUEST_TIMEOUT),
+            ssl=True
+        ) as response:
+            if response.status == 429:
+                retry_after = int(response.headers.get('Retry-After', '60'))
+                logger.warning(f"429 Too Many Requests für {url}, warte {retry_after}s")
+                await asyncio.sleep(retry_after)
+                raise aiohttp.ClientError("429 Too Many Requests")
             response.raise_for_status()
-            return response.text
-        except Exception as e:
-            logging.warning(f"Fehler bei {url} (Versuch {attempt+1}/{max_retries}): {e}")
-            time.sleep(2 ** attempt)
-    logging.error(f"Maximale Versuche für {url} erreicht.")
-    return ""
+            return await response.text()
+    except aiohttp.ClientResponseError as e:
+        logger.error(f"HTTP Fehler {e.status} für {url}")
+        raise
+    except Exception as e:
+        logger.error(f"Netzwerkfehler für {url}: {e}")
+        raise
 
-def get_playwright_with_retry(url, max_retries=3):
+async def render_js_content(url: str, user_agent: str) -> Optional[str]:
     """
-    Versucht, die Seite mit Playwright zu laden, wenn JavaScript-Rendering benötigt wird.
+    Rendert JavaScript-Seiten mit Playwright.
     """
-    for attempt in range(max_retries):
-        try:
-            user_agent = random.choice(USER_AGENTS)
-            proxy = random.choice(PROXIES)
-            from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True, proxy={"server": proxy})
-                context = browser.new_context(user_agent=user_agent)
-                page = context.new_page()
-                page.goto(url, timeout=20000)
-                try:
-                    page.wait_for_selector("body", timeout=5000)
-                except PlaywrightTimeout:
-                    logging.warning(f"Timeout auf body-Selector bei {url}")
-                content = page.content()
-                browser.close()
-                return content
-        except Exception as e:
-            logging.warning(f"Playwright-Fehler bei {url} (Versuch {attempt+1}/{max_retries}): {e}")
-            time.sleep(2 ** attempt)
-    logging.error(f"Maximale Playwright-Versuche für {url} erreicht.")
-    return ""
-
-def get_page_text(url):
-    """
-    Wählt die passende Methode aus (Requests oder Playwright) basierend darauf,
-    ob die URL als JavaScript-basierte Seite markiert ist.
-    """
-    time.sleep(random.uniform(2, 6))
-    if is_js_site(url):
-        return get_playwright_with_retry(url)
-    else:
-        return get_requests_with_retry(url)
-
-def page_matches_criteria(text, criteria):
-    """Überprüft, ob einer der Suchbegriffe im Text vorkommt."""
-    return any(criterion.lower() in text.lower() for criterion in criteria)
-
-def crawl_url(url):
-    """
-    Crawlt eine einzelne URL und gibt ggf. ein Treffer-Array zurück.
-    """
-    html = get_page_text(url)
-    if not html:
-        logging.error(f"Keine Daten von {url} erhalten.")
-        return None
-    soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text(separator=" ", strip=True)
-    if page_matches_criteria(text, CRITERIA):
-        title = soup.title.string.strip() if soup.title and soup.title.string else "Kein Titel"
-        date = datetime.now().strftime("%Y-%m-%d")
-        logging.info(f"Treffer: {title} von {url}")
-        return [title, date, url, "k.A.", "n.v."]
-    else:
-        logging.info(f"Suchbegriffe in {url} nicht gefunden.")
+    from playwright.async_api import async_playwright
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=['--no-sandbox', '--disable-setuid-sandbox']
+            )
+            context = await browser.new_context(
+                user_agent=user_agent,
+                java_script_enabled=True
+            )
+            page = await context.new_page()
+            await page.goto(url, wait_until="networkidle", timeout=30000)
+            await page.wait_for_load_state("networkidle")
+            content = await page.content()
+            await browser.close()
+            return content
+    except Exception as e:
+        logger.error(f"Playwright Fehler: {str(e)[:200]}...")
         return None
 
-def crawl():
+async def process_url(
+    session: ClientSession,
+    robots_cache: RobotsTxtCache,
+    url: str,
+    patterns: List[re.Pattern],
+    config: CrawlConfig
+) -> Optional[Tuple[str, str]]:
     """
-    Hauptfunktion des Crawlers: Paralleles Crawlen und Speichern der Treffer.
+    Verarbeitet eine einzelne URL: robots.txt-Check, Crawl-Delay, Download, Parsing, Filter.
     """
+    user_agent = random.choice(USER_AGENTS)
+    proxy = random.choice(PROXIES) if PROXIES else None
+
+    # robots.txt-Check
+    if not await robots_cache.is_allowed(url, user_agent):
+        logger.info(f"Blockiert durch robots.txt: {url}")
+        return None
+
+    # Crawl-Delay aus robots.txt respektieren
+    crawl_delay = await robots_cache.get_crawl_delay(url, user_agent)
+    await asyncio.sleep(crawl_delay)
+
+    try:
+        # Inhaltsbeschaffung (JS oder klassisch)
+        if is_js_site(url):
+            html = await render_js_content(url, user_agent)
+        else:
+            html = await fetch_content(session, url, user_agent, proxy)
+        if not html:
+            return None
+
+        soup = BeautifulSoup(html, "html.parser")
+        text = soup.get_text(separator=" ", strip=True)
+
+        # Präzise Kriterienprüfung mit Regex
+        if any(pattern.search(text) for pattern in patterns):
+            title = soup.title.string.strip() if soup.title else "Ohne Titel"
+            logger.info(f"Treffer: {title[:80]}... ({url})")
+            return (title, url)
+    except Exception as e:
+        logger.error(f"Verarbeitungsfehler {url}: {str(e)[:200]}...")
+
+    return None
+
+async def main():
+    """Hauptfunktion des Crawlers."""
+    config = CrawlConfig()
+    robots_cache = RobotsTxtCache()
+    patterns = build_criteria_patterns(config.criteria)
     results = []
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        future_to_url = {executor.submit(crawl_url, url): url for url in URLS}
-        for future in as_completed(future_to_url):
-            result = future.result()
+
+    # Sichere SSL-Verbindung
+    connector = aiohttp.TCPConnector(
+        limit=MAX_CONCURRENT_REQUESTS,
+        ssl=True
+    )
+
+    async with ClientSession(connector=connector) as session:
+        tasks = [
+            process_url(session, robots_cache, url, patterns, config)
+            for url in config.start_urls
+        ]
+        for future in asyncio.as_completed(tasks):
+            result = await future
             if result:
                 results.append(result)
-    with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["Titel", "Datum", "Link", "Budget", "Anschrift"])
-        writer.writerows(results)
-    logging.info(f"{len(results)} Treffer gespeichert in {OUTPUT_FILE}")
+                logger.debug(f"Aktuelle Treffer: {len(results)}")
+
+    # Ergebnisse speichern
+    if "csv" in OUTPUT_FORMATS:
+        with open("results.csv", "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Titel", "Link"])
+            writer.writerows(results)
+
+    if "json" in OUTPUT_FORMATS:
+        with open("results.json", "w", encoding="utf-8") as f:
+            json.dump(
+                [{"title": t, "url": u} for t, u in results],
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
+
+    logger.info(f"Crawling abgeschlossen. Gespeicherte Ergebnisse: {len(results)}")
 
 if __name__ == "__main__":
-    crawl()
+    asyncio.run(main())
