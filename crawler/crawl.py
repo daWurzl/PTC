@@ -50,7 +50,10 @@ class CrawlConfig:
             "https://www.ausschreibungsmonitor.de/",
             "https://www.druckportal.de/",
             "https://www.auftragsboerse.de/",
-            "https://www.bundesanzeiger.de/"
+            "https://www.bundesanzeiger.de/",
+            "https://www.aumass.de/ausschreibungen?params=druck/",
+            "https://www.ibau.de/auftraege-nach-branche/dienstleistungen/druckauftraege-druckdienstleistungen/",
+            "https://oeffentlichevergabe.de/ui/de/search/"
         ]
         self.criteria = self.criteria or [
             "22000000-0", "22100000-1", "22110000-4", "22120000-7", "22450000-9",
