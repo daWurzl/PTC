@@ -1,201 +1,136 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Druck-Ausschreibungen</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" />
-  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css" />
-  <style>
-    :root {
-      --bg: #f9fafb;
-      --text: #111827;
-      --card: #ffffff;
-      --accent: #2563eb;
-      --accent-hover: #1d4ed8;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #1f2937;
-        --text: #f3f4f6;
-        --card: #374151;
-        --accent: #3b82f6;
-        --accent-hover: #60a5fa;
-      }
-    }
-
-    body {
-      font-family: 'Inter', sans-serif;
-      margin: 0;
-      padding: 1rem;
-      background-color: var(--bg);
-      color: var(--text);
-    }
-
-    h1 {
-      text-align: center;
-      margin-bottom: 2rem;
-      font-size: 2rem;
-    }
-
-    .container {
-      width: 100%;
-      padding: 1rem 2vw;
-      box-sizing: border-box;
-      background: var(--card);
-      border-radius: 0.75rem;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      overflow-x: auto;
-    }
-
-    table.dataTable {
-      width: 100% !important;
-      border-collapse: collapse;
-    }
-
-    th, td {
-      padding: 0.75rem;
-      text-align: left;
-      vertical-align: top;
-    }
-
-    th {
-      background-color: var(--bg);
-      color: var(--text);
-      font-weight: 600;
-    }
-
-    tr:nth-child(even) {
-      background-color: rgba(0, 0, 0, 0.02);
-    }
-
-    .dt-button {
-      background-color: var(--accent) !important;
-      color: #fff !important;
-      border: none !important;
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-
-    .dt-button:hover {
-      background-color: var(--accent-hover) !important;
-    }
-
-    /* Sucheingabefeld Styling */
-    .dataTables_filter label {
-      font-weight: 500;
-    }
-
-    .dataTables_filter input {
-      width: 400px !important;
-      max-width: 100%;
-      padding: 0.4rem 0.6rem;
-      border: 1px solid #d1d5db;
-      border-radius: 0.375rem;
-      margin-left: 0.5rem;
-      background: #fff;
-      color: #111827;
-    }
-
-    @media (max-width: 768px) {
-      h1 { font-size: 1.5rem; }
-      .container { padding: 0.5rem; }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Druck-Ausschreibungen</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f7f9fb;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 6px 32px rgba(60,72,88,0.12);
+            padding: 32px 16px 24px 16px;
+        }
+        h1 {
+            text-align: center;
+            color: #2a3547;
+            margin-bottom: 24px;
+            font-size: 2.2rem;
+            letter-spacing: 0.5px;
+        }
+        .download-btn {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 18px;
+        }
+        .download-btn a {
+            display: inline-block;
+            background: #2563eb;
+            color: #fff;
+            padding: 10px 22px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1rem;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.07);
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .download-btn a:hover {
+            background: #1e40af;
+            box-shadow: 0 4px 16px rgba(37,99,235,0.15);
+        }
+        .responsive-table {
+            width: 100%;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 400px;
+            background: #fff;
+        }
+        th, td {
+            padding: 14px 18px;
+            text-align: left;
+        }
+        th {
+            background: #e3eafc;
+            color: #2a3547;
+            font-size: 1.07rem;
+            font-weight: 600;
+            border-bottom: 2px solid #c7d2fe;
+        }
+        tr {
+            transition: background 0.2s;
+        }
+        tr:nth-child(even) {
+            background: #f4f8fc;
+        }
+        tr:hover {
+            background: #e0e7ff;
+        }
+        td a {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        td a:hover {
+            color: #1e40af;
+            text-decoration: underline;
+        }
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px 2px;
+            }
+            th, td {
+                padding: 10px 8px;
+                font-size: 0.97rem;
+            }
+            h1 {
+                font-size: 1.3rem;
+            }
+            table {
+                min-width: 320px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <h1>Druck-Ausschreibungen</h1>
-  <div class="container">
-    <table id="ausschreibungen" class="display nowrap" aria-describedby="ausschreibungstabelle">
-      <thead>
-        <tr>
-          <th>Titel</th>
-          <th>Datum</th>
-          <th>Link</th>
-          <th>Budget</th>
-          <th>Anschrift</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
-<script>
-  fetch('../data/results.csv')
-    .then(response => response.text())
-    .then(csv => {
-      const rows = csv.trim().split('\n').slice(1);
-      const tbody = document.querySelector('#ausschreibungen tbody');
-      rows.forEach(row => {
-        const cols = row.split(',');
-        if (cols.length >= 5) {
-          const tr = document.createElement('tr');
-          cols.forEach((col, i) => {
-            const td = document.createElement('td');
-            if (i === 2 && col.startsWith('http')) {
-              const a = document.createElement('a');
-              a.href = col;
-              a.target = '_blank';
-              a.rel = 'noopener noreferrer';
-              a.textContent = 'Zur Ausschreibung';
-              td.appendChild(a);
-            } else {
-              td.textContent = col;
-            }
-            tr.appendChild(td);
-          });
-          tbody.appendChild(tr);
-        }
-      });
-
-// Initialisiert eine neue DataTable-Instanz für das HTML-Element mit der ID "ausschreibungen"
-const table = new DataTable('#ausschreibungen', {
-  
-  // Legt das Layout-Template der DataTable fest.
-  // Die einzelnen Zeichen stehen für:
-  // 'B' - Buttons (z.B. Export-Buttons)
-  // 'f' - Filter (Suchfeld)
-  // 'r' - "Processing" Anzeige (bei lang laufenden Operationen)
-  // 't' - Tabelle (das eigentliche Tabellenelement)
-  // 'i' - Informationsanzeige (z.B. "Zeige x bis y Einträge von z")
-  // 'p' - Paging (Seitennavigation)
-  dom: 'Bfrtip',
-
-  // Aktiviert das responsive Verhalten der Tabelle,
-  // sodass sich die Darstellung je nach Bildschirmgröße dynamisch anpasst.
-  responsive: true,
-
-  // Fügt einen Button hinzu, mit dem der Tabelleninhalt als CSV exportiert werden kann.
-  // 'csvHtml5' steht hier für den Export über HTML5-Funktionalitäten.
-  buttons: ['csvHtml5'],
-
-  // Sprach- und Texteinstellungen, um die Benutzeroberfläche der DataTable zu lokalisieren.
-  language: {
-    // Lädt ein JSON-File mit deutschen Übersetzungen für die DataTable-Oberfläche.
-    url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/de-DE.json',
-    
-    // Überschreibt das Standardlabel des Suchfeldes.
-    // Dieser Text wird links neben dem Suchfeld angezeigt.
-    search: "Suchen ", // Label oben > links neben dem Suchfeld
-    
-    // Setzt den Placeholder-Text des eigentlichen Input-Feldes.
-    // Dieser Text erscheint im Eingabebereich, solange noch nichts eingegeben wurde.
-    searchPlaceholder: " suchen ..." // Text Placeholder im Input-Feld
-  }
-});
-
-});
-</script>
-
+    <div class="container">
+        <h1>Druck-Ausschreibungen</h1>
+        <div class="download-btn">
+            <a href="../data/results.csv" download="results.csv">CSV herunterladen</a>
+        </div>
+        <div class="responsive-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Titel</th>
+                        <th>Link</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Beispiel-Daten, diese Zeilen werden dynamisch ersetzt -->
+                    <tr>
+                        <td><a href="https://www.example.com/123" target="_blank" rel="noopener">Ausschreibung Druckerzeugnisse</a></td>
+                        <td>https://www.example.com/123</td>
+                    </tr>
+                    <tr>
+                        <td><a href="https://www.example.com/456" target="_blank" rel="noopener">Bauprojekt Musterstadt</a></td>
+                        <td>https://www.example.com/456</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 </body>
 </html>
