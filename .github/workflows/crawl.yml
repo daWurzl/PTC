@@ -21,11 +21,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 3. Installiere benötigte Pakete
+      # 3. Installiere benötigte Pakete (mit uvloop)
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install aiohttp beautifulsoup4 pydantic python-dotenv playwright
+          pip install aiohttp beautifulsoup4 pydantic python-dotenv playwright uvloop
 
       # 4. Playwright-Browser installieren
       - name: Install browsers
@@ -37,11 +37,11 @@ jobs:
           mkdir -p data
           echo "Directory structure:" && tree
 
-      # 6. Crawler ausführen (mit angepassten Environment-Variablen)
+      # 6. Crawler ausführen
       - name: Run crawler
         env:
-          OUTPUT_CSV: data/results.csv  # Pfad relativ zum Repository-Root
-          CONCURRENT_REQUESTS: 3       # Überschreibt die .env-Einstellung
+          OUTPUT_CSV: data/results.csv
+          CONCURRENT_REQUESTS: 3
         run: |
           echo "Starting crawler..."
           python crawler/crawl.py
