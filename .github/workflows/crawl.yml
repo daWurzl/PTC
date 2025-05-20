@@ -2,36 +2,38 @@ name: Zeitsteuerung
 
 on:
   schedule:
-    - cron: "0 */4 * * *"   # Läuft alle 4 Stunden um :00 (UTC-Zeit)
-  workflow_dispatch:        # Manuelle Auslösung über GitHub UI
+    - cron: "0 */4 * * *"   # Jede 4. Stunde um :00 Uhr UTC
+  workflow_dispatch:
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 30     # Timeout für gesamten Job
+    timeout-minutes: 45  # Erhöhtes Timeout für komplexe Crawls
 
     steps:
-      - name: Repository auschecken
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Python 3.11 einrichten
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Installiere Abhängigkeiten
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install aiohttp beautifulsoup4 pydantic python-dotenv playwright
 
-      - name: Installiere Chromium für Playwright
-        run: playwright install chromium
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium  # Stellt alle Abhängigkeiten sicher
 
-      - name: Erstelle Datenverzeichnis
+      - name: Create data directory
         run: mkdir -p crawler/data
 
-      - name: Führe Crawler aus
-        working-directory: ./crawler  # Wechselt ins Crawler-Verzeichnis
-        run: python crawl.py
+      - name: Run crawler
+        working-directory: ./crawler
+        run: python -u crawl.py  # -u für ungepufferte Ausgabe
         env:
-          OUTPUT_CSV: data/results.csv  # Pfad relativ zum Arbeitsverzeichnis
+          OUTPUT_CSV: data/results.csv
+          # Füge hier weitere benötigte Umgebungsvariablen hinzu
+          PYTHONUNBUFFERED: 1  # Sofortige Log-Ausgabe
