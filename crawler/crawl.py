@@ -12,9 +12,14 @@ from urllib.parse import urlparse
 # ---------------------------------------------------------------
 if os.name == 'posix':
     import resource
+    # Begrenze die maximale CPU-Zeit auf 300 Sekunden
     resource.setrlimit(resource.RLIMIT_CPU, (300, 300))
+    # Begrenze den virtuellen Speicher auf 500 MB
     memory_limit = 500 * 1024 * 1024
     resource.setrlimit(resource.RLIMIT_AS, (memory_limit, memory_limit))
+    # Begrenze die maximale Anzahl an offenen Dateien/Prozessen
+    resource.setrlimit(resource.RLIMIT_NOFILE, (500, 500))
+    resource.setrlimit(resource.RLIMIT_NPROC, (50, 50))
 
 import aiohttp
 from aiohttp import ClientTimeout
@@ -43,7 +48,6 @@ class Settings(BaseModel):
         ],
         description="10 Fallback-Start-URLs für deutsche/europäische Seiten"
     )
-    
     USER_AGENTS: List[str] = Field(
         default=[
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
@@ -59,7 +63,6 @@ class Settings(BaseModel):
         ],
         description="10 aktuelle User-Agents für verschiedene Plattformen"
     )
-
     OUTPUT_CSV: str = Field(default="data/results.csv")
     CONCURRENT_REQUESTS: int = Field(default=5)
     REQUEST_TIMEOUT: int = Field(default=30)
@@ -95,7 +98,7 @@ error_count = 0
 playwright_semaphore = asyncio.Semaphore(3)
 
 # ---------------------------------------------------------------
-# Hauptfunktionen (unverändert)
+# Hauptfunktionen
 # ---------------------------------------------------------------
 async def fetch_page(session: aiohttp.ClientSession, url: str, user_agent: str, **kwargs) -> Optional[str]:
     global error_count
@@ -115,8 +118,12 @@ async def fetch_page(session: aiohttp.ClientSession, url: str, user_agent: str, 
         return None
 
 async def fetch_js_page(url: str, user_agent: str, proxy: Optional[str] = None) -> Optional[str]:
+    """
+    Lädt JavaScript-seitig gerenderten Inhalt mit Playwright und schließt den Browser IMMER.
+    """
     global error_count
     async with playwright_semaphore:
+        browser = None
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
@@ -129,12 +136,15 @@ async def fetch_js_page(url: str, user_agent: str, proxy: Optional[str] = None) 
                 await page.goto(url, timeout=settings.REQUEST_TIMEOUT * 1000)
                 content = await page.content()
                 await context.close()
-                await browser.close()
                 return content
         except Exception as e:
             error_count += 1
             logger.warning(f"Playwright-Fehler bei {url}: {str(e)[:50]}...")
             return None
+        finally:
+            # Stelle sicher, dass der Browser immer geschlossen wird!
+            if browser:
+                await browser.close()
 
 async def process_url(session: aiohttp.ClientSession, url: str) -> Optional[Tuple[str, str]]:
     global error_count
