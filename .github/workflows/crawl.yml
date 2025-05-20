@@ -37,10 +37,11 @@ jobs:
           mkdir -p data
           echo "Directory structure:" && tree
 
-      # 6. Crawler ausführen
+      # 6. Crawler ausführen (mit angepassten Environment-Variablen)
       - name: Run crawler
         env:
           OUTPUT_CSV: data/results.csv  # Pfad relativ zum Repository-Root
+          CONCURRENT_REQUESTS: 3       # Überschreibt die .env-Einstellung
         run: |
           echo "Starting crawler..."
           python crawler/crawl.py
