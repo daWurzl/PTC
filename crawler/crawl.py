@@ -7,6 +7,13 @@ import random
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
+# Korrekter Import des gesamten aiohttp-Moduls
+import aiohttp
+from aiohttp import ClientTimeout, TCPConnector
+from bs4 import BeautifulSoup
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+from playwright.async_api import async_playwright
+
 # ---------------------------------------------------------------
 # Ressourcenlimits für GitHub Actions optimiert
 # ---------------------------------------------------------------
