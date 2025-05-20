@@ -108,7 +108,7 @@
     <div class="container">
         <h1>Druck-Ausschreibungen</h1>
         <div class="download-btn">
-            <a href="../data/results.csv" download="results.csv">CSV herunterladen</a>
+            <a href="data/results.csv" download="results.csv">CSV herunterladen</a>
         </div>
         <div class="responsive-table">
             <table>
@@ -128,7 +128,7 @@
     </div>
     <script>
     // CSV-Daten laden und Tabelle füllen
-    fetch('../data/results.csv')
+    fetch('data/results.csv')
         .then(response => {
             if (!response.ok) throw new Error("CSV nicht gefunden");
             return response.text();
