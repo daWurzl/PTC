@@ -2,13 +2,13 @@ name: Zeitsteuerung
 
 on:
   schedule:
-    - cron: "0 */4 * * *"   # Jede 4. Stunde um :00 Uhr UTC
+    - cron: "0 */4 * * *"
   workflow_dispatch:
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 45  # Erhöhtes Timeout für komplexe Crawls
+    timeout-minutes: 45
 
     steps:
       - name: Checkout Code
@@ -25,15 +25,14 @@ jobs:
           pip install aiohttp beautifulsoup4 pydantic python-dotenv playwright
 
       - name: Install Playwright browsers
-        run: playwright install --with-deps chromium  # Stellt alle Abhängigkeiten sicher
+        run: playwright install --with-deps chromium
 
       - name: Create data directory
-        run: mkdir -p crawler/data
+        run: mkdir -p data
 
       - name: Run crawler
-        working-directory: ./crawler
-        run: python -u crawl.py  # -u für ungepufferte Ausgabe
+        run: python crawler/crawl.py
         env:
-          OUTPUT_CSV: data/results.csv
-          # Füge hier weitere benötigte Umgebungsvariablen hinzu
-          PYTHONUNBUFFERED: 1  # Sofortige Log-Ausgabe
+          # Falls du OUTPUT_CSV in der .env überschreiben willst:
+          # OUTPUT_CSV: data/results.csv
+          PYTHONUNBUFFERED: 1
