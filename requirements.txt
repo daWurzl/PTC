@@ -18,6 +18,11 @@ beautifulsoup4==4.12.3
 playwright==1.42.0
 
 # ---------------------------------------------
+# Systemmonitoring & Ressourcenanalyse
+# psutil: Überwacht RAM-, CPU- und Prozessauslastung in Echtzeit
+psutil==5.9.5
+
+# ---------------------------------------------
 # Datenvalidierung und Konfigurationsmanagement
 # Pydantic: Für typsichere Einstellungen und .env-Integration
 pydantic==2.7.0
