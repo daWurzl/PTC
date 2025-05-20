@@ -1,4 +1,4 @@
-name: Zeitsteuerung
+name: Web Crawler Schedule
 
 on:
   schedule:
@@ -8,7 +8,7 @@ on:
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60  # Erhöhtes Timeout
 
     steps:
       - name: Checkout Code
@@ -24,15 +24,36 @@ jobs:
           python -m pip install --upgrade pip
           pip install aiohttp beautifulsoup4 pydantic python-dotenv playwright
 
-      - name: Install Playwright browsers
-        run: playwright install --with-deps chromium
+      - name: Install Playwright with dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2
+          playwright install chromium
+
+      - name: Validate environment
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Directory contents:"
+          ls -R
+          echo "Checking .env:"
+          cat crawler/.env || echo "No .env file found"
 
       - name: Create data directory
-        run: mkdir -p data
+        run: |
+          mkdir -p data
+          sudo chmod -R 777 data  # Temporäre Berechtigungslösung
 
-      - name: Run crawler
-        run: python crawler/crawl.py
+      - name: Run crawler with debug
+        run: |
+          python -u crawler/crawl.py 2>&1 | tee crawler.log
         env:
-          # Falls du OUTPUT_CSV in der .env überschreiben willst:
-          # OUTPUT_CSV: data/results.csv
           PYTHONUNBUFFERED: 1
+
+      - name: Upload logs
+        if: always()  # Läuft auch bei Fehlern
+        uses: actions/upload-artifact@v3
+        with:
+          name: debug-logs
+          path: |
+            crawler.log
+            data/results.csv
