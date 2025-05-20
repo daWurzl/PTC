@@ -8,7 +8,7 @@ on:
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 60     # Erhöhtes Timeout für längere Crawls
+    timeout-minutes: 90     # Erhöhtes Timeout für längere Crawls
 
     steps:
       # 1. Repository-Code herunterladen
