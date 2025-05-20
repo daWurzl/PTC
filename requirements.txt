@@ -1,7 +1,9 @@
 # ---------------------------------------------
 # Asynchrone HTTP-Client/Server-Funktionalität
 # Für parallele, schnelle Webanfragen ohne Blockierung des Programms
+# UVLoop: Schnellere asyncio Event-Loop (ersetzt die Standardimplementierung)
 aiohttp==3.9.3
+uvloop==0.19.0
 
 # ---------------------------------------------
 # Web-Scraping (automatisches Extrahieren von Daten aus Webseiten)
