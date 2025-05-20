@@ -14,15 +14,17 @@ from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from playwright.async_api import async_playwright
 
+import psutil  # <--- NEU: Für Ressourcen-Logging
+
 # ---------------------------------------------------------------
 # Ressourcenlimits für GitHub Actions optimiert
 # ---------------------------------------------------------------
 if os.name == 'posix':
     import resource
-    resource.setrlimit(resource.RLIMIT_CPU, (300, 300))
-    resource.setrlimit(resource.RLIMIT_AS, (200 * 1024 * 1024, 200 * 1024 * 1024))  # 200 MB
-    resource.setrlimit(resource.RLIMIT_NOFILE, (50, 50))
-    resource.setrlimit(resource.RLIMIT_NPROC, (10, 10))
+    resource.setrlimit(resource.RLIMIT_CPU, (600, 600))
+    resource.setrlimit(resource.RLIMIT_AS, (1024 * 1024 * 1024, 1024 * 1024 * 1024))  # 1 GB
+    resource.setrlimit(resource.RLIMIT_NOFILE, (1024, 1024))
+    resource.setrlimit(resource.RLIMIT_NPROC, (128, 128))
 
 # ---------------------------------------------------------------
 # Asyncio-Konfiguration mit uvloop für bessere Performance
@@ -32,11 +34,6 @@ try:
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 except ImportError:
     pass
-
-from aiohttp import ClientTimeout, TCPConnector
-from bs4 import BeautifulSoup
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from playwright.async_api import async_playwright
 
 # ---------------------------------------------------------------
 # Globaler Playwright Browser Pool
@@ -56,7 +53,7 @@ class BrowserPool:
             self._playwright = await async_playwright().start()
             self._browser = await self._playwright.chromium.launch(
                 headless=True,
-                args=["--single-process", "--disable-dev-shm-usage"]
+                args=["--single-process", "--disable-dev-shm-usage", "--no-sandbox"]
             )
         return self._browser
 
@@ -74,7 +71,6 @@ class BrowserPool:
 env_path = os.path.join(os.path.dirname(__file__), ".env")
 
 class Settings(BaseModel):
-    # Fallback-Start-URLs
     START_URLS: List[str] = Field(default=[
         "https://www.bund.de/",
         "https://www.bundestag.de/",
@@ -87,7 +83,6 @@ class Settings(BaseModel):
         "https://www.handelsblatt.com/",
         "https://www.zeit.de/"
     ])
-    # Fallback User-Agents
     USER_AGENTS: List[str] = Field(default=[
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
@@ -101,7 +96,7 @@ class Settings(BaseModel):
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     ])
     OUTPUT_CSV: str = Field(default="data/results.csv")
-    CONCURRENT_REQUESTS: int = Field(default=2)  # Stark reduziert
+    CONCURRENT_REQUESTS: int = Field(default=1)  # Stark reduziert
     REQUEST_TIMEOUT: int = Field(default=30)
     JS_SITES: List[str] = Field(default=[])
     USE_PROXIES: bool = Field(default=False)
@@ -219,6 +214,9 @@ async def crawl():
 
         logger.info(f"Starte Crawling mit {len(settings.START_URLS)} URLs, Ausgabe: {settings.OUTPUT_CSV}")
 
+        # Ressourcen-Logging vor dem Crawl
+        logger.info(f"RAM-Auslastung: {psutil.virtual_memory().percent}% | Prozesse: {len(psutil.pids())}")
+
         results = []
         tasks = [process_url(session, url) for url in settings.START_URLS]
 
@@ -227,6 +225,8 @@ async def crawl():
             if res:
                 results.append(res)
                 logger.info(f"Gefunden: {res[0][:30]}... ({res[1]})")
+            # Ressourcen-Logging nach jedem Request
+            logger.info(f"RAM-Auslastung: {psutil.virtual_memory().percent}% | Prozesse: {len(psutil.pids())}")
 
         # CSV schreiben
         with open(settings.OUTPUT_CSV, "w", newline="", encoding="utf-8") as f:
