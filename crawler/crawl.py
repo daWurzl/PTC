@@ -12,12 +12,12 @@ from urllib.parse import urlparse
 # ---------------------------------------------------------------
 if os.name == 'posix':
     import resource
-    # Begrenze die maximale CPU-Zeit auf 300 Sekunden
+    # Max CPU-Zeit in Sekunden (hier 300s)
     resource.setrlimit(resource.RLIMIT_CPU, (300, 300))
-    # Begrenze den virtuellen Speicher auf 500 MB
-    memory_limit = 500 * 1024 * 1024
+    # Max virtueller Speicher (hier 500 MB)
+    memory_limit = 500 * 1024 * 1024  # Bytes
     resource.setrlimit(resource.RLIMIT_AS, (memory_limit, memory_limit))
-    # Begrenze die maximale Anzahl an offenen Dateien/Prozessen
+    # Max offene Dateien/Prozesse
     resource.setrlimit(resource.RLIMIT_NOFILE, (500, 500))
     resource.setrlimit(resource.RLIMIT_NPROC, (50, 50))
 
@@ -48,6 +48,7 @@ class Settings(BaseModel):
         ],
         description="10 Fallback-Start-URLs für deutsche/europäische Seiten"
     )
+    
     USER_AGENTS: List[str] = Field(
         default=[
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
@@ -63,18 +64,38 @@ class Settings(BaseModel):
         ],
         description="10 aktuelle User-Agents für verschiedene Plattformen"
     )
-    OUTPUT_CSV: str = Field(default="data/results.csv")
-    CONCURRENT_REQUESTS: int = Field(default=5)
-    REQUEST_TIMEOUT: int = Field(default=30)
-    JS_SITES: List[str] = Field(default=[])
-    USE_PROXIES: bool = Field(default=False)
-    PROXIES: List[str] = Field(default=[])
+
+    OUTPUT_CSV: str = Field(
+        default="data/results.csv",
+        description="Ausgabepfad für CSV-Datei"
+    )
+    CONCURRENT_REQUESTS: int = Field(
+        default=3,  # Reduzierte Parallelität
+        description="Maximale parallele Anfragen"
+    )
+    REQUEST_TIMEOUT: int = Field(
+        default=30,
+        description="Timeout in Sekunden pro Request"
+    )
+    JS_SITES: List[str] = Field(
+        default=[],
+        description="Domains mit JavaScript-Rendering (kommagetrennt)"
+    )
+    USE_PROXIES: bool = Field(
+        default=False,
+        description="Proxy-Handling aktivieren"
+    )
+    PROXIES: List[str] = Field(
+        default=[],
+        description="Liste der Proxy-URLs (z.B. http://user:pass@host:port)"
+    )
 
     model_config = ConfigDict(env_file=env_path, env_file_encoding="utf-8")
 
     @field_validator("START_URLS", "USER_AGENTS", "JS_SITES", "PROXIES", mode="before")
     @classmethod
     def split_comma_separated(cls, v):
+        """Teilt kommagetrennte Strings in Listen auf."""
         if isinstance(v, str):
             return [s.strip() for s in v.split(",") if s.strip()]
         return v
@@ -101,6 +122,7 @@ playwright_semaphore = asyncio.Semaphore(3)
 # Hauptfunktionen
 # ---------------------------------------------------------------
 async def fetch_page(session: aiohttp.ClientSession, url: str, user_agent: str, **kwargs) -> Optional[str]:
+    """Lädt HTML-Inhalt asynchron mit Timeout und User-Agent (ohne JS)."""
     global error_count
     headers = {"User-Agent": user_agent}
     try:
@@ -118,9 +140,7 @@ async def fetch_page(session: aiohttp.ClientSession, url: str, user_agent: str, 
         return None
 
 async def fetch_js_page(url: str, user_agent: str, proxy: Optional[str] = None) -> Optional[str]:
-    """
-    Lädt JavaScript-seitig gerenderten Inhalt mit Playwright und schließt den Browser IMMER.
-    """
+    """Lädt JavaScript-seitig gerenderten Inhalt mit Playwright (Headless-Browser)."""
     global error_count
     async with playwright_semaphore:
         browser = None
@@ -135,32 +155,53 @@ async def fetch_js_page(url: str, user_agent: str, proxy: Optional[str] = None) 
                 page = await context.new_page()
                 await page.goto(url, timeout=settings.REQUEST_TIMEOUT * 1000)
                 content = await page.content()
-                await context.close()
                 return content
         except Exception as e:
             error_count += 1
             logger.warning(f"Playwright-Fehler bei {url}: {str(e)[:50]}...")
             return None
         finally:
-            # Stelle sicher, dass der Browser immer geschlossen wird!
+            # Sicherstellen, dass der Browser IMMER geschlossen wird
             if browser:
                 await browser.close()
 
-async def process_url(session: aiohttp.ClientSession, url: str) -> Optional[Tuple[str, str]]:
+async def process_url(
+    session: aiohttp.ClientSession,
+    url: str
+) -> Optional[Tuple[str, str]]:
+    """
+    Verarbeitet eine URL:
+    - Erkennt, ob JS-Rendering nötig ist
+    - Lädt HTML (mit oder ohne JS)
+    - Parst Title und liefert (title, url)
+    """
     global error_count
+
+    # Domain-Prüfung für JavaScript-Seiten
     domain = urlparse(url).netloc
     use_js = any(js_domain in domain for js_domain in settings.JS_SITES)
 
-    proxy = random.choice(settings.PROXIES) if settings.USE_PROXIES and settings.PROXIES else None
+    # Proxy-Handling
+    proxy = None
+    if settings.USE_PROXIES and settings.PROXIES:
+        proxy = random.choice(settings.PROXIES)
+        logger.debug(f"Verwende Proxy: {proxy}")
+
     user_agent = random.choice(settings.USER_AGENTS)
 
     try:
-        html = await (fetch_js_page(url, user_agent, proxy) if use_js 
-                     else fetch_page(session, url, user_agent, proxy=proxy))
-        
+        if use_js:
+            logger.info(f"Verwende Playwright für JS-Seite: {url}")
+            html = await fetch_js_page(url, user_agent, proxy)
+        else:
+            if proxy:
+                html = await fetch_page(session, url, user_agent, proxy=proxy)
+            else:
+                html = await fetch_page(session, url, user_agent)
+
         if not html:
             return None
-
+        
         soup = BeautifulSoup(html, "html.parser")
         title_tag = soup.find("title")
         title = title_tag.string.strip() if title_tag else "Ohne Titel"
@@ -172,22 +213,29 @@ async def process_url(session: aiohttp.ClientSession, url: str) -> Optional[Tupl
         return None
 
 async def crawl():
+    """Hauptfunktion: crawlt Start-URLs und speichert Ergebnisse in CSV."""
+    # Verzeichnis prüfen
     out_dir = os.path.dirname(settings.OUTPUT_CSV)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
 
-    logger.info(f"Starte Crawling mit {len(settings.START_URLS)} URLs")
+    logger.info(
+        f"Starte Crawling mit {len(settings.START_URLS)} URLs, "
+        f"Ausgabe: {settings.OUTPUT_CSV}"
+    )
 
-    results = []
+    results: List[Tuple[str, str]] = []
+
     connector = aiohttp.TCPConnector(limit=settings.CONCURRENT_REQUESTS)
-    
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = [process_url(session, url) for url in settings.START_URLS]
         for future in asyncio.as_completed(tasks):
-            if res := await future:
+            res = await future
+            if res:
                 results.append(res)
                 logger.info(f"Gefunden: {res[0][:30]}... ({res[1]})")
 
+    # Ergebnisse in CSV schreiben
     with open(settings.OUTPUT_CSV, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["Title", "URL"])
@@ -199,5 +247,5 @@ if __name__ == "__main__":
     try:
         asyncio.run(crawl())
     except Exception as e:
-        logger.error(f"Kritischer Fehler: {e}")
+        logger.error(f"Unerwarteter Fehler: {e}")
         sys.exit(1)
