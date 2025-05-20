@@ -176,3 +176,7 @@ test-results/
 # Sicherstellen, dass sensible Dateien nicht eingecheckt werden
 secrets.*
 private_keys.*
+
+# GitHub Pages: .nojekyll muss im Repo bleiben (unter root oder im /docs-Verzeichnis)
+# und darf in .gitignore nicht ausgeschlossen werden (deshalb auch das "!" davor)!
+!.nojekyll
