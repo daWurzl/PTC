@@ -1,23 +1,26 @@
-# HTTP-Anfragen dienen der Kommunikation zwischen Browser und Server,
-# indem sie Informationen oder Ressourcen anfordern oder übertragen
-requests
+# ---------------------------------------------
+# Asynchrone HTTP-Client/Server-Funktionalität
+# Für parallele, schnelle Webanfragen ohne Blockierung des Programms
+aiohttp==3.9.3
 
-# Web-Scraping (Daten werden automatisch aus einer Webseite extrahiert)
-# und HTML-Parsing (Analysieren und Umwandeln dieser Daten in eine strukturierte Form)
-beautifulsoup4
+# ---------------------------------------------
+# Web-Scraping (automatisches Extrahieren von Daten aus Webseiten)
+# und HTML-Parsing (Umwandlung von HTML in eine strukturierte Form)
+beautifulsoup4==4.12.3
 
-# Playwright steuert Anwendungen wie Webseiten, Formulareingaben, Klicksimulationen
-# sowie die Aufzeichnung von Screenshots/Videos und ist ideal für das Web-Scraping -
-# unterstützt den Headless-Modus, sodass Anwendungen ohne grafische Benutzeroberfläche
-# schnell und ressourcensparend ausgeführt werden
-playwright
+# ---------------------------------------------
+# Headless-Browser-Steuerung für JavaScript-lastige Seiten
+# Playwright kann Webseiten wie ein echter Browser rendern,
+# Formulare ausfüllen, Klicks simulieren und Screenshots/Videos machen.
+# Unterstützt Headless-Modus für schnelle, ressourcensparende Ausführung.
+playwright==1.42.0
 
-# --- Ergänzungen für asynchrones und robustes Crawling ---
+# ---------------------------------------------
+# Datenvalidierung und Konfigurationsmanagement
+# Pydantic: Für typsichere Einstellungen und .env-Integration
+pydantic==2.7.0
 
-# aiohttp ermöglicht asynchrone HTTP-Anfragen und ist optimal für parallele,
-# schnelle Webanfragen ohne Blockierung des Programms (wichtig für hohe Skalierbarkeit)
-aiohttp
-
-# tenacity bietet eine flexible und zuverlässige Retry-Logik (Wiederholungsmechanismen)
-# mit Backoff-Strategien, um Netzwerkfehler und temporäre Probleme automatisch abzufangen
-tenacity
+# ---------------------------------------------
+# .env-Dateien einfach laden und Umgebungsvariablen verwalten
+# python-dotenv: Liest Konfigurationswerte aus .env-Dateien ein
+python-dotenv==1.0.1
