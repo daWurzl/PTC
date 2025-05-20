@@ -118,19 +118,54 @@
                         <th>Link</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <!-- Beispiel-Daten, diese Zeilen werden dynamisch ersetzt -->
+                <tbody id="data-container">
                     <tr>
-                        <td><a href="https://www.example.com/123" target="_blank" rel="noopener">Ausschreibung Druckerzeugnisse</a></td>
-                        <td>https://www.example.com/123</td>
-                    </tr>
-                    <tr>
-                        <td><a href="https://www.example.com/456" target="_blank" rel="noopener">Bauprojekt Musterstadt</a></td>
-                        <td>https://www.example.com/456</td>
+                        <td colspan="2" style="text-align:center; color: #888;">Lade Daten...</td>
                     </tr>
                 </tbody>
             </table>
         </div>
     </div>
+    <script>
+    // CSV-Daten laden und Tabelle füllen
+    fetch('../data/results.csv')
+        .then(response => {
+            if (!response.ok) throw new Error("CSV nicht gefunden");
+            return response.text();
+        })
+        .then(data => {
+            const rows = data.trim().split('\n');
+            const tbody = document.getElementById('data-container');
+            tbody.innerHTML = ""; // Vorherige Platzhalter entfernen
+
+            // Header-Zeile überspringen
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (row.trim()) {
+                    // CSV kann Kommas im Titel enthalten, daher nur das erste Komma splitten
+                    const firstComma = row.indexOf(',');
+                    let title = row.slice(0, firstComma).replace(/(^"|"$)/g, '').trim();
+                    let url = row.slice(firstComma + 1).replace(/(^"|"$)/g, '').trim();
+
+                    // Füge Zeile hinzu
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><a href="${url}" target="_blank" rel="noopener">${title}</a></td>
+                            <td>${url}</td>
+                        </tr>
+                    `;
+                }
+            }
+
+            // Falls keine Daten vorhanden sind
+            if (tbody.innerHTML.trim() === "") {
+                tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color: #888;">Keine Daten gefunden.</td></tr>`;
+            }
+        })
+        .catch(error => {
+            const tbody = document.getElementById('data-container');
+            tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color: #c00;">Fehler beim Laden der Daten: ${error.message}</td></tr>`;
+        });
+    </script>
 </body>
 </html>
