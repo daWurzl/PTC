@@ -1,4 +1,4 @@
-name: Web Crawler Schedule
+name: Zeitsteuerung
 
 on:
   schedule:
