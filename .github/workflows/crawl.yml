@@ -21,35 +21,31 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 3. Installiere benötigte Pakete (mit uvloop)
+      # 3. Abhängigkeiten installieren (aus requirements.txt)
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           playwright install chromium
 
-      # 4. Playwright-Browser installieren (optional, bereits in Schritt 3 enthalten)
-      # - name: Install browsers
-      #   run: playwright install chromium
-
-      # 5. Datenverzeichnis erstellen
+      # 4. Datenverzeichnis erstellen
       - name: Create directories
         run: |
           mkdir -p data
           echo "Directory structure:" && tree
 
-      # 6. Crawler ausführen
+      # 5. Crawler im TEST_MODE ausführen
       - name: Run crawler
         env:
+          TEST_MODE: '1'            # Testmodus aktivieren
           OUTPUT_CSV: data/results.csv
-          CONCURRENT_REQUESTS: 3
         run: |
-          echo "Starting crawler..."
+          echo "Starting crawler (TEST_MODE)..."
           python crawler/crawl.py
           echo "Crawling completed. Results:"
           [ -f data/results.csv ] && wc -l data/results.csv || echo "No results file found"
 
-      # 7. Ergebnisse als Artefakt speichern
+      # 6. Ergebnisse als Artefakt speichern
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
